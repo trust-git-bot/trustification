@@ -9,9 +9,10 @@ use yew_nested_router::components::Link;
 
 use crate::{
     backend::{Endpoint, PackageService, SearchOptions},
-    components::common::SafeHtml,
-    hooks::use_backend::use_backend,
+    components::{common::SafeHtml, simple_pagination::SimplePagination},
+    hooks::{use_backend::*, use_pagination_state::*},
     pages::AppRoute,
+    utils::pagination_to_offset,
 };
 
 #[derive(PartialEq, Properties)]
@@ -19,6 +20,8 @@ pub struct PackageSearchProperties {
     pub callback: Callback<UseAsyncHandleDeps<SearchResult<Rc<Vec<PackageSummary>>>, String>>,
 
     pub query: Option<String>,
+
+    pub pagination: PaginationState,
 
     #[prop_or_default]
     pub toolbar_items: ChildrenWithProps<ToolbarItem>,
@@ -29,9 +32,6 @@ pub fn package_search(props: &PackageSearchProperties) -> Html {
     let backend = use_backend();
 
     let service = use_memo(|backend| PackageService::new((**backend).clone()), backend.clone());
-
-    let offset = use_state_eq(|| 0);
-    let limit = use_state_eq(|| 10);
 
     // the active query
     let state = use_state_eq(|| {
@@ -48,20 +48,20 @@ pub fn package_search(props: &PackageSearchProperties) -> Html {
     let search = {
         let service = service.clone();
         use_async_with_cloned_deps(
-            move |(state, offset, limit)| async move {
+            move |(state, page, per_page)| async move {
                 service
                     .search_packages(
                         &state,
                         &SearchOptions {
-                            offset: Some(offset),
-                            limit: Some(limit),
+                            offset: Some(pagination_to_offset(page, per_page)),
+                            limit: Some(per_page),
                         },
                     )
                     .await
                     .map(|result| result.map(Rc::new))
                     .map_err(|err| err.to_string())
             },
-            ((*state).clone(), *offset, *limit),
+            ((*state).clone(), props.pagination.page, props.pagination.per_page),
         )
     };
 
@@ -100,31 +100,6 @@ pub fn package_search(props: &PackageSearchProperties) -> Html {
     // pagination
 
     let total = search.data().and_then(|d| d.total);
-    let onlimit = {
-        let limit = limit.clone();
-        Callback::from(move |n| {
-            limit.set(n);
-        })
-    };
-    let onnavigation = {
-        if let Some(total) = total {
-            let offset = offset.clone();
-
-            let limit = limit.clone();
-            Callback::from(move |nav| {
-                let o = match nav {
-                    Navigation::First => 0,
-                    Navigation::Last => total - *limit,
-                    Navigation::Next => *offset + *limit,
-                    Navigation::Previous => *offset - *limit,
-                    Navigation::Page(n) => *limit * n - 1,
-                };
-                offset.set(o);
-            })
-        } else {
-            Callback::default()
-        }
-    };
 
     let hidden = text.is_empty();
 
@@ -161,15 +136,13 @@ pub fn package_search(props: &PackageSearchProperties) -> Html {
                     { for props.toolbar_items.iter() }
 
                     <ToolbarItem r#type={ToolbarItemType::Pagination}>
-                        <Pagination
-                            total_entries={total}
-                            selected_choice={*limit}
-                            offset={*offset}
-                            entries_per_page_choices={vec![10, 25, 50]}
-                            {onnavigation}
-                            {onlimit}
-                        >
-                        </Pagination>
+                        <SimplePagination
+                            total_items={total}
+                            page={props.pagination.page}
+                            per_page={props.pagination.per_page}
+                            on_page_change={&props.pagination.on_page_change}
+                            on_per_page_change={&props.pagination.on_per_page_change}
+                        />
                     </ToolbarItem>
 
                 </ToolbarContent>
@@ -273,7 +246,7 @@ pub fn package_result(props: &PackageResultProperties) -> Html {
 
     html!(
          <Table<Column, UseTableData<Column, MemoizedTableModel<PackageEntry>>>
-             mode={TableMode::CompactExpandable}
+             mode={TableMode::Expandable}
              {header}
              {entries}
              {onexpand}

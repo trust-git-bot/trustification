@@ -5,10 +5,14 @@ use spog_model::prelude::*;
 use yew::prelude::*;
 use yew_more_hooks::hooks::r#async::*;
 
-use crate::components::{
-    async_state_renderer::AsyncStateRenderer,
-    common::PageHeading,
-    package::{PackageResult, PackageSearch},
+use crate::{
+    components::{
+        async_state_renderer::AsyncStateRenderer,
+        common::PageHeading,
+        package::{PackageResult, PackageSearch},
+        simple_pagination::SimplePagination,
+    },
+    hooks::use_pagination_state::*,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Properties)]
@@ -30,19 +34,34 @@ pub fn package(props: &PackageProps) -> Html {
     };
     let query = props.query.clone();
 
+    // Pagination
+    let total = search.data().and_then(|d| d.total);
+    let pagination_state = use_pagination_state(|| UsePaginationStateArgs {
+        initial_items_per_page: 10,
+    });
+
     html!(
         <>
             <PageHeading subtitle="Search packages">{"Packages"}</PageHeading>
 
             // We need to set the main section to fill, as we have a footer section
             <PageSection variant={PageSectionVariant::Default} fill={PageSectionFill::Fill}>
-                <PackageSearch {callback} {query} />
+                <PackageSearch {callback} {query} pagination={pagination_state.clone()}/>
 
                  <AsyncStateRenderer<PackageSummary>
                     state={(*search).clone()}
                     on_ready={Callback::from(move |result| {
                         html!(<PackageResult {result} />)
                     })}
+                />
+
+                <SimplePagination
+                    position={PaginationPosition::Bottom}
+                    total_items={total}
+                    page={pagination_state.page}
+                    per_page={pagination_state.per_page}
+                    on_page_change={pagination_state.on_page_change}
+                    on_per_page_change={pagination_state.on_per_page_change}
                 />
             </PageSection>
         </>

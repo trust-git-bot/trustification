@@ -3,6 +3,9 @@ use yew::prelude::*;
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct SimplePaginationProps {
+    #[prop_or(PaginationPosition::Top)]
+    pub position: PaginationPosition,
+
     pub total_items: Option<usize>,
     pub page: usize,
     pub per_page: usize,
@@ -25,6 +28,7 @@ pub fn simple_pagination(props: &SimplePaginationProps) -> Html {
 
     html!(
         <Pagination
+            position={props.position}
             total_entries={props.total_items}
             offset={(props.page - 1) * props.per_page}
             selected_choice={props.per_page}

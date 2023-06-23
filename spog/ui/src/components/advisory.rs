@@ -1,11 +1,11 @@
 use crate::{
     backend::{Endpoint, SearchOptions, VexService},
     hooks::use_backend::use_backend,
-    hooks::use_pagination_state::{use_pagination_state, UsePaginationStateArgs},
+    hooks::use_pagination_state::*,
     utils::pagination_to_offset,
 };
 
-use crate::{components::cvss::CvssScore, components::simple_pagination::SimplePagination, utils::cvss::Cvss};
+use crate::components::simple_pagination::SimplePagination;
 use patternfly_yew::prelude::*;
 use spog_model::prelude::*;
 use std::rc::Rc;
@@ -21,6 +21,8 @@ pub struct AdvisorySearchProperties {
 
     pub query: Option<String>,
 
+    pub pagination: PaginationState,
+
     #[prop_or_default]
     pub toolbar_items: ChildrenWithProps<ToolbarItem>,
 }
@@ -30,10 +32,6 @@ pub fn advisory_search(props: &AdvisorySearchProperties) -> Html {
     let backend = use_backend();
 
     let service = use_memo(|backend| VexService::new((**backend).clone()), backend.clone());
-
-    let pagination_state = use_pagination_state(|| UsePaginationStateArgs {
-        initial_items_per_page: 10,
-    });
 
     // the active query
     let state = use_state_eq(|| {
@@ -61,7 +59,7 @@ pub fn advisory_search(props: &AdvisorySearchProperties) -> Html {
                     .map(|result| result.map(Rc::new))
                     .map_err(|err| err.to_string())
             },
-            ((*state).clone(), pagination_state.page, pagination_state.per_page),
+            ((*state).clone(), props.pagination.page, props.pagination.per_page),
         )
     };
 
@@ -138,10 +136,10 @@ pub fn advisory_search(props: &AdvisorySearchProperties) -> Html {
                     <ToolbarItem r#type={ToolbarItemType::Pagination}>
                         <SimplePagination
                             total_items={total}
-                            page={pagination_state.page}
-                            per_page={pagination_state.per_page}
-                            on_page_change={pagination_state.on_page_change}
-                            on_per_page_change={pagination_state.on_per_page_change}
+                            page={props.pagination.page}
+                            per_page={props.pagination.per_page}
+                            on_page_change={&props.pagination.on_page_change}
+                            on_per_page_change={&props.pagination.on_per_page_change}
                         />
                     </ToolbarItem>
 
@@ -260,7 +258,6 @@ pub fn vulnerability_result(props: &AdvisoryResultProperties) -> Html {
 
     html!(
         <Table<Column, UseTableData<Column, MemoizedTableModel<AdvisoryEntry>>>
-            mode={TableMode::CompactExpandable}
             {header}
             {entries}
             {onexpand}
