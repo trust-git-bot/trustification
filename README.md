@@ -1,3 +1,4 @@
+
 # Trustification
 
 [![CI](https://github.com/trustification/trustification/workflows/CI/badge.svg)](https://github.com/trustification/trustification/actions?query=workflow%3A%22CI%22)
